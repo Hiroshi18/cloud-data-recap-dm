@@ -1,134 +1,297 @@
 
-[//]: # ( challenge tech stack: vertex-ai workbench )
+[//]: # ( challenge tech stack: mlflow prefect no-livecode )
 
 [//]: # ( challenge instructions )
 
-## Vertex AI Workbench
+## ❓ TL;DR MLflow instructions
 
-Let's explore **Vertex AI Workbench** as an alternative to **Compute Engine** for the model training.
+### Train a model from scratch on the 500k dataset
 
-_Vertex AI Workbench_ provides managed virtual machines allowing to run ML code without having to configure precisely the environment for the code:
-- _User managed notebooks_ provides a customisable environment and allows to specify package versions
-- _Managed notebooks_ uses custom containers, can be extended to read or write to big query or cloud storage, and can be scheduled for run
+<details>
+  <summary markdown='span'><strong>🎬 Setup the parameters</strong></summary>
 
-### Create a workbench instance
+  ``` bash
+  cp .env.sample .env
+  direnv allow
+  direnv reload
+  ```
+</details>
 
-Create a workbench instance:
-- [Vertex AI Workbench](https://console.cloud.google.com/vertex-ai/workbench)
-- _USER-MANAGED NOTEBOOKS_ / _NEW NOTEBOOK_
-- _TensorFlow Enterprise_ / _TensorFlow Enterprise 2.8 (with LTS)_ / _Without GPUs_
-- Notebook name: _cloud-training-recap_
-- _ADVANCED OPTIONS_ / Operating System: _Ubuntu 20.04_
-- _CREATE_
+<details>
+  <summary markdown='span'><strong>🏋️‍♂️ Train the model</strong></summary>
 
-👉 The workbench should be ready in a couple of minutes
+  ``` bash
+  make run_preprocess
+  make run_train
+  make run_evaluate
+  ```
+</details>
 
-Open the virtual machine
-- _OPEN JUPYTERLAB_
-- Install [gh](https://github.com/cli/cli/blob/trunk/docs/install_linux.md) for _Ubuntu_
+<details>
+  <summary markdown='span'><strong>🏁 Put the model in production</strong></summary>
 
-### Install zsh and oh-my-zsh
+  In **MLflow** set the model _stage_ as _Production_
+</details>
 
-Install zsh:
+### Handle the January dataset
+
+<details>
+  <summary markdown='span'><strong>🎬 Inject the dataset</strong></summary>
+
+  ``` bash
+  python get_new_data.py jan
+  ```
+</details>
+
+<details>
+  <summary markdown='span'><strong>👀 Observe the evolution of the performance</strong></summary>
+
+  The performance of the model in production on the new data seems to be stable.
+
+  👉 No need to train a new model
+</details>
+
+### Handle other monthly datasets
+
+<details>
+  <summary markdown='span'><strong>🎬 Inject the monthly dataset</strong></summary>
+
+  ``` bash
+  python get_new_data.py jan
+  ```
+</details>
+
+<details>
+  <summary markdown='span'><strong>👀 Observe the evolution of the performance</strong></summary>
+
+  👉 Define with the business a performance threshold on which to act, for example a variation of the performance of $0.3
+
+  🤔 If the performance degrades significantly, train a new model
+
+  🤔 If the performance of the new model is good enough, put it in production
+</details>
+
+## ❓ TL;DR Prefect instructions
+
+### Workflow setup and local visualize
+
+<details>
+  <summary markdown='span'><strong>🔑 Authenticate to Prefect</strong></summary>
+
+  ``` bash
+  prefect auth login -k YOUR_KEY
+  ```
+</details>
+
+<details>
+  <summary markdown='span'><strong>🎬 Start a Prefect agent</strong></summary>
+
+  ``` bash
+  prefect agent local start
+  ```
+</details>
+
+<details>
+  <summary markdown='span'><strong>👀 Visualize the workflow locally</strong></summary>
+
+  ``` bash
+  make run_workflow
+  ```
+</details>
+
+### Workflow quick run
+
+<details>
+  <summary markdown='span'><strong>📝 Register the workflow in Prefect Cloud</strong></summary>
+
+  Set `PREFECT_BACKEND=production` in the `.env` and `direnv reload`.
+
+  In the `taxifare.flow.main` module, comment out the `LocalDaskExecutor` line.
+
+  ``` bash
+  make run_workflow
+  ```
+</details>
+
+<details>
+  <summary markdown='span'><strong>🚕 Quick run the workflow</strong></summary>
+
+  Run the workflow in the Prefect UI using _Quick Run_.
+</details>
+
+<details>
+  <summary markdown='span'><strong>👀 Observe the performance in the notification app</strong></summary>
+
+  Check the performance in the notification board: https://wagon-chat.herokuapp.com/
+</details>
+
+### Run the automated workflow
+
+<details>
+  <summary markdown='span'><strong>📆 Schedule the workflow</strong></summary>
+
+  Create a schedule in the Prefect UI.
+</details>
+
+<details>
+  <summary markdown='span'><strong>♻️ For each month</strong></summary>
+
+  💉 Inject new data
+
+  👀 Observe the performance in the notification app
+
+  🤔 Put the newly trained model in production if appropriate
+</details>
+
+### Optimize the workflow
+
+<details>
+  <summary markdown='span'><strong>📝 Register a parallel version of the workflow</strong></summary>
+
+  In the `taxifare.flow.main` module, uncomment the `LocalDaskExecutor` line.
+
+  ``` bash
+  make run_workflow
+  ```
+</details>
+
+<details>
+  <summary markdown='span'><strong>👀 Observe the workflow evolution</strong></summary>
+
+  In the Prefect UI, the workflow tasks execute in parallel whenever possible.
+</details>
+
+## MLflow
+
+Let's track the evolution of the performance of our model accross time using **MLflow**.
+
+### Setup
+
+Let's create a `.env` file:
 
 ``` bash
-sudo apt-get install zsh
-```
-
-Install oh-my-zsh:
-
-``` bash
-sh -c "$(curl -fsSL https://raw.github.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
-```
-
-### Authenticate to GitHub 1/2
-
-Go to workbench instance and open a terminal.
-
-Run the `gh auth login` command:
-- Account: `GitHub.com`
-- Protocol: `HTTPS`
-- Authenticate Git with your GitHub credentials: `Yes`
-- Authentication method: `Paste an authentication token`
-
-### Create a GitHub token
-
-Create a GitHub token to allow the workbench to access to your account:
-- [GitHub Tokens](https://github.com/settings/tokens)
-- _Generate new token_
-- Fill _Note_ with a meaningul name: _Vertex AI Workbench token_
-- Check the scopes: 'repo', 'read:org', 'workflow'
-- _Generate token_
-- Copy the token (you will not be able to retrieve it later)
-
-### Authenticate to GitHub 2/2
-
-In workbench instance terminal:
-- Paste the token in the Vertex AI instance terminal
-
-### Clone your project repo
-
-Clone your repo using an `HTTPS` URL:
-
-``` bash
-git clone https://github.com/gmanchon/cloud-data-recap-dm
-cd cloud-data-recap-dm
 cp .env.sample .env
-nano .env
 ```
 
-Edit the project configuration file:
-- Set the data source as `DATA_SOURCE="big query"`
-- Exit and save `Ctrl + X`, `Y`, `Enter`
-
-Install direnv:
+And setup the local data path in the `.env`:
 
 ``` bash
-curl -sfL https://direnv.net/install.sh | bash
-eval "$(direnv hook zsh)"
-direnv allow .
+LOCAL_DATA_PATH=~/.lewagon/mlops/data
+LOCAL_REGISTRY_PATH=~/.lewagon/mlops/training_outputs
 ```
 
-Install package:
+Then `direnv allow .` and `direnv reload` and retrieve the latest version of the data using either:
+- `make reset_sources_all` in order to reset datasets of all sizes in local disk + Big Query
+- `make reset_sources_env` in order to reset datasets of size `DATASET_SIZE` / `VALIDATION_DATASET_SIZE` in local disk + Big Query
+
+Create an account on [Prefect Cloud](https://www.prefect.io/) if you do not have one.
+
+### Past data
+
+Let's train the model with an initial `500k` dataset with:
 
 ``` bash
-pip install -e .
-mkdir -p training_outputs/params training_outputs/metrics training_outputs/models
+DATASET_SIZE=500k
+VALIDATION_DATASET_SIZE=500k
+CHUNK_SIZE=1000000
+
+DATA_SOURCE=local
+MODEL_TARGET=mlflow
 ```
 
-Run the preprocess and training:
+👉 We boosted the chunk size and use local CSV in order to improve the speed of the trainings
+
+Make sure to update the _MLflow_ and _GCP_ (for _Big Query_) parameters:
+- `MLFLOW_EXPERIMENT`
+- `MLFLOW_MODEL_NAME`
+- `PROJECT`
+- `DATASET`
+
+Update and reload your `.env`, then train the model and observe the raw performance in `mlflow`:
+- `make run_preprocess`
+- `make run_train`
+
+### New data
+
+Now that the initial model is trained and stored in **MLflow**, let's inject new data and see how the model behaves.
+
+Update and reload your `.env` to play with the new data source:
 
 ``` bash
-make run_preprocess run_train
-tree training_outputs
+DATASET_SIZE=new
+VALIDATION_DATASET_SIZE=new
 ```
 
-### New workbench terminal
+For January, February and March:
+- Inject new data with `python get_new_data.py jan`
+- Preprocess the data with `make run_preprocess`
+- Observe how the model in production performes on the new data with `make run_evaluate`
+- If the model performance degrade more than $.1, train a new model from the model in production with `make run_train`
+- Observe the performance of the new model
+- If the performance of the new model is good enough, annotate the new model to be in production in **mlflow**
 
-Manually hook direnv:
+👉 Performance should be stable in January and start to evolve from February
+
+## Prefect
+
+Now that we understand how to track the performance of our model, let's automate the model lifecycle.
+
+Authenticate to Prefect Cloud with `prefect auth login -k YOUR_KEY`.
+
+Start a local agent so that the outcome of the workflow runs on your machine are persisted in **Prefect**.
+
+### Reset your data source
+
+Let's go through our datasets all over again, but this time using **Prefect** in order to automate everything.
+
+We want to start over from the latest model having been trained from scratch on the `500k` dataset.
+
+Go to **MLflow** and mark the latest model trained from scratch on the `500k` dataset as in `Production`.
+
+### Sequential workflow
+
+Update and reload your `.env` with parameters for Prefect Cloud:
 
 ``` bash
-eval "$(direnv hook zsh)"
+PREFECT_BACKEND=production
+PREFECT_FLOW_NAME=taxifare_lifecycle_<user.github_nickname>
 ```
 
-### Handling the `.env` in jupyter lab
+👉 Make sur your project exists in Prefect Cloud (the default is `taxifare_project`)
 
-The easiest solution is to manually define the environment variables from python:
+Register your workflow:
 
-``` python
-import os
-
-os.environ["DATASET_SIZE"] = "10k"
-os.environ["VALIDATION_DATASET_SIZE"] = "10k"
-os.environ["CHUNK_SIZE"] = "2000"
-os.environ["DATA_SOURCE"] = "local"
-os.environ["MODEL_TARGET"] = "local"
-os.environ["PREFECT_BACKEND"] = "local"
-os.environ["PROJECT"] = "le-wagon-dsa"
+``` bash
+make run_workflow
 ```
 
-## Compute Engine vs Vertex AI Workbench
+Connect to Prefect Cloud:
+- 👀 Navigation: verify that your workflow has been uploaded
+- 👀 Agents: verify that your local agent is running
 
-In _Compute Engine_ we can see that _Vertex AI Workbench_ uses a _Compute Engine_ instance behind the scenes:
+### Go through months
 
-<img src='https://wagon-public-datasets.s3.eu-west-1.amazonaws.com/data-science-images/07-ML-OPS/mlops/vertex-ai-compute-engine.png'>
+Let's inject the _January_ dataset with `python get_new_data.py jan`.
+
+Then run the workflow once through the Prefect Cloud UI:
+- 👀 Quick run
+
+👉 Now that everything is connected, we can schedule the workflow to run automatically
+
+Configure the `channel` in `taxifare.flow.flow` module.
+
+Schedule the workflow in the Prefect Cloud UI:
+- 👀 Schedules
+
+Have a look at the notification board: https://wagon-chat.herokuapp.com/
+
+### Parallel workflow
+
+The sequential workflow is pretty slow, let's see how we can run it faster.
+
+In the `taxifare.flow.flow` module, uncomment the `LocalDaskExecutor` line.
+
+Register the new workflow using `make run_workflow`.
+
+In the Prefect Cloud UI:
+- 👀 Task run: have a look at the logs

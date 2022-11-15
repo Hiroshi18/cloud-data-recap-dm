@@ -13,4 +13,4 @@ class TestPackageVersion(TestBase):
 
         package_summary = self.load_results()
 
-        assert "cloud_recap" in package_summary, "the `taxifare` package version is not correct, please run `make reinstall_package` to reinstall the package"
+        assert "lifecycle_recap" in package_summary, "the `taxifare` package version is not correct, please run `make reinstall_package` to reinstall the package"

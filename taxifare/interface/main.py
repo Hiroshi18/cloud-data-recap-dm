@@ -6,7 +6,10 @@ from colorama import Fore, Style
 from taxifare.ml_logic.data import clean_data, get_chunk, save_chunk
 from taxifare.ml_logic.model import initialize_model, compile_model, train_model, evaluate_model
 from taxifare.ml_logic.params import CHUNK_SIZE, DATASET_SIZE, VALIDATION_DATASET_SIZE
-from taxifare.ml_logic.preprocessor import preprocess_featuresfrom taxifare.ml_logic.registry import load_model, save_model
+from taxifare.ml_logic.preprocessor import preprocess_features
+from taxifare.ml_logic.utils import get_dataset_timestamp
+from taxifare.ml_logic.registry import get_model_version
+from taxifare.ml_logic.registry import load_model, save_model
 
 
 def preprocess(source_type = 'train'):
@@ -106,6 +109,8 @@ def train():
     y_val = data_val_processed[:, -1]
 
     model = None
+    model = load_model()  # production model
+
     # Model params
     learning_rate = 0.001
     batch_size = 256
@@ -188,7 +193,10 @@ def train():
         # Data source
         training_set_size=DATASET_SIZE,
         val_set_size=VALIDATION_DATASET_SIZE,
-        row_count=row_count,    )
+        row_count=row_count,
+        model_version=get_model_version(),
+        dataset_timestamp=get_dataset_timestamp(),
+    )
 
     # Save model
     save_model(model=model, params=params, metrics=dict(mae=val_mae))
@@ -226,6 +234,9 @@ def evaluate():
 
     # Save evaluation
     params = dict(
+        dataset_timestamp=get_dataset_timestamp(),
+        model_version=get_model_version(),
+
         # Package behavior
         context="evaluate",
 

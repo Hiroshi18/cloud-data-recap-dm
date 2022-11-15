@@ -1,1 +1,1 @@
-Summary: TaxiFare Model (cloud_recap)
+Summary: TaxiFare Model (lifecycle_recap)

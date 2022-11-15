@@ -19,3 +19,10 @@ tensorflow==2.10.0; sys_platform != 'darwin' # Windows & Ubuntu Intel chips
 google-cloud-bigquery<3.0.0
 google-cloud-storage
 pyarrow
+
+mlflow~=1.26.1
+
+python-dotenv
+prefect<2
+prefect[viz]
+psycopg2-binary

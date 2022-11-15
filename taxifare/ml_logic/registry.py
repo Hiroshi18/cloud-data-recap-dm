@@ -1,5 +1,8 @@
 from taxifare.ml_logic.params import LOCAL_REGISTRY_PATH
 
+import mlflow
+from mlflow.tracking import MlflowClient
+
 import glob
 import os
 import time
@@ -19,31 +22,36 @@ def save_model(model: Model = None,
 
     timestamp = time.strftime("%Y%m%d-%H%M%S")
 
-    if os.environ.get("MODEL_TARGET") == "gcs":
+    if os.environ.get("MODEL_TARGET") == "mlflow":
 
-        if model is not None:
+        # retrieve mlflow env params
+        mlflow_tracking_uri = os.environ.get("MLFLOW_TRACKING_URI")
+        mlflow_experiment = os.environ.get("MLFLOW_EXPERIMENT")
+        mlflow_model_name = os.environ.get("MLFLOW_MODEL_NAME")
 
-            from google.cloud import storage
+        # configure mlflow
+        mlflow.set_tracking_uri(mlflow_tracking_uri)
+        mlflow.set_experiment(experiment_name=mlflow_experiment)
 
-            print(Fore.BLUE + "\nSave model to cloud storage..." + Style.RESET_ALL)
+        with mlflow.start_run():
 
-            # save model locally
-            model_path = os.path.join(LOCAL_REGISTRY_PATH, "models",
-                                      timestamp + ".pickle")
+            # STEP 1: push parameters to mlflow
+            if params is not None:
+                mlflow.log_params(params)
 
-            model.save(model_path)
+            # STEP 2: push metrics to mlflow
+            if metrics is not None:
+                mlflow.log_metrics(metrics)
 
-            # upload model files
-            files = glob.glob(f"{model_path}/**/*.*", recursive=True)
+            # STEP 3: push model to mlflow
+            if model is not None:
 
-            for file in files:
+                mlflow.keras.log_model(keras_model=model,
+                                       artifact_path="model",
+                                       keras_module="tensorflow.keras",
+                                       registered_model_name=mlflow_model_name)
 
-                storage_filename = file[17:]
-
-                client = storage.Client()
-                bucket = client.bucket(os.environ["BUCKET_NAME"])
-                blob = bucket.blob(storage_filename)
-                blob.upload_from_filename(file)
+        print("\n✅ data saved to mlflow")
 
         return None
 
@@ -78,11 +86,36 @@ def load_model(save_copy_locally=False) -> Model:
     """
     load the latest saved model, return None if no model found
     """
-    if os.environ.get("MODEL_TARGET") == "gcs":
+    if os.environ.get("MODEL_TARGET") == "mlflow":
+        stage = "Production"
 
-        print(Fore.RED + "\nTODO: get model from cloud storage" + Style.RESET_ALL)
+        print(Fore.BLUE + f"\nLoad model {stage} stage from mlflow..." + Style.RESET_ALL)
 
-        return None
+        # load model from mlflow
+        mlflow.set_tracking_uri(os.environ.get("MLFLOW_TRACKING_URI"))
+
+        mlflow_model_name = os.environ.get("MLFLOW_MODEL_NAME")
+
+        model_uri = f"models:/{mlflow_model_name}/{stage}"
+        print(f"- uri: {model_uri}")
+
+        try:
+            model = mlflow.keras.load_model(model_uri=model_uri)
+            print("\n✅ model loaded from mlflow")
+        except:
+            print(f"\n❌ no model in stage {stage} on mlflow")
+            return None
+
+        if save_copy_locally:
+            from pathlib import Path
+
+            # Create the LOCAL_REGISTRY_PATH directory if it does exist
+            Path(LOCAL_REGISTRY_PATH).mkdir(parents=True, exist_ok=True)
+            timestamp = time.strftime("%Y%m%d-%H%M%S")
+            model_path = os.path.join(LOCAL_REGISTRY_PATH, "models", timestamp)
+            model.save(model_path)
+
+        return model
 
     print(Fore.BLUE + "\nLoad model from local disk..." + Style.RESET_ALL)
 
@@ -101,3 +134,32 @@ def load_model(save_copy_locally=False) -> Model:
 
     return model
 
+
+def get_model_version(stage="Production"):
+    """
+    Retrieve the version number of the latest model in the given stage
+    - stages: "None", "Production", "Staging", "Archived"
+    """
+
+    if os.environ.get("MODEL_TARGET") == "mlflow":
+
+        mlflow.set_tracking_uri(os.environ.get("MLFLOW_TRACKING_URI"))
+
+        mlflow_model_name = os.environ.get("MLFLOW_MODEL_NAME")
+
+        client = MlflowClient()
+
+        try:
+            version = client.get_latest_versions(name=mlflow_model_name, stages=[stage])
+        except:
+            return None
+
+        # check whether a version of the model exists in the given stage
+        if not version:
+            return None
+
+        return int(version[0].version)
+
+    # model version not handled
+
+    return None
